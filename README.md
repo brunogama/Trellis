@@ -1,12 +1,12 @@
-# Trellis
+## Trellis
 
-[![Swift](https://img.shields.io/badge/Swift-5.6-orange.svg?style=for-the-badge&logo=swift)](https://swift.org)
+[![Swift](https://img.shields.io/badge/Swift-5.6-orange.svg?style=for-the-badge&logo=swift)](https://swift.org/)
 [![Xcode](https://img.shields.io/badge/Xcode-13-blue.svg?style=for-the-badge&logo=Xcode&logoColor=white)](https://developer.apple.com/xcode)
 [![MIT](https://img.shields.io/badge/license-MIT-black.svg?style=for-the-badge)](https://opensource.org/licenses/MIT)
 
-Trellis features a declarative DSL that simplifies service bootstrapping: 
+Trellis features a declarative DSL that simplifies service bootstrapping:
 
-```swift
+```
 let cluster = try await Bootstrap {
     Group {
         Store(model: IdentityModel.self)
@@ -35,13 +35,13 @@ let cluster = try await Bootstrap {
 
 This sets up two services managing the identity of the user and his articles. The resulting cluster exposes only one function, `send`, which can be used to interact with the services without explicitly know which service handles which action.
 
-```swift
+```
 try await cluster.send(action: StartUpAction.appDidCompleteLaunching)
 ```
 
 Most of the time we won't declare services like this. Instead, we'd write a custom service wrapping each store:
 
-```swift
+```
 // IdentityService.swift
 struct IdentityService: Service {
     var body: some Service {
@@ -59,11 +59,32 @@ let cluster = try await Bootstrap {
     IdentityService()
         .with(model: identityModel)
 }
+
 ```
 
 Notice how the actual model is injected from outside the service, enabling dependency injection.
 
+### Streamlined Event Sending
+
+If you only need to send a single event, you can use the new `EventSender` or the convenience methods:
+
+```swift
+// Option 1: Using EventSender directly
+let sender = try await EventSender {
+    IdentityService()
+        .with(model: identityModel)
+}
+try await sender.send(action: IdentityAction.login(email: "user@example.com", password: "password"))
+
+// Option 2: Using the convenience method
+try await Service.sendSingleEvent(to: IdentityService().with(model: identityModel), 
+                                  action: IdentityAction.login(email: "user@example.com", password: "password"))
+```
+
+This provides a more streamlined approach when you only need to send a single event without setting up a full Bootstrap.
+
 ## Index
+
 * [Installation](#installation)
 * [Getting started](#getting-started)
 * [Concurrency](#concurrency)
@@ -74,17 +95,19 @@ Notice how the actual model is injected from outside the service, enabling depen
 ## Installation
 
 Using Swift Package Manager:
+
 ```
 .package(name: "Trellis",
          url: "https://github.com/valentinradu/Trellis.git",
          .upToNextMinor(from: "0.3.0-beta"))
+
 ```
 
 ## Getting started
 
 ### Actions and services
 
-Services are entities that react to actions. They form a tree-like structure that allows each parent service to delegate actions to its children. Most of the entities in Trellis are services. 
+Services are entities that react to actions. They form a tree-like structure that allows each parent service to delegate actions to its children. Most of the entities in Trellis are services.
 
 ### Modifiers
 
@@ -100,7 +123,7 @@ Each store encapsulates a model, which in turn, handles a set of tasks (and thei
 
 ## Modifiers
 
-`.emit(using:consumeAtBootstrap:)` - Takes an external source of events (async stream) that outputs actions and feeds them to all services under it. When setting `
+`.emit(using:consumeAtBootstrap:)` - Takes an external source of events (async stream) that outputs actions and feeds them to all services under it. When setting `consumeAtBootstrap` to `true`, the emitter will start consuming events as soon as the cluster is constructed.
 
 `.transformError(transformHandler:)` - Turns all errors originating from services under it into actions and feeds them back into the cluster. If the transformed error throws again, the operation will fail and the `send(action:)` function with throw.
 
@@ -124,7 +147,7 @@ Trellis uses the Swift concurrency model and guarantees that the services will b
 
 With Trellis, unit testing is mostly focused around the models. However, if you wish to also test the service integration, it's easy to do so. You can simply replace the model with a mocked version and the cluster send function with one that records actions instead:
 
-```swift
+```
 // SomeTest.swift
 let cluster = try await Bootstrap {
     IdentityService()
@@ -137,4 +160,5 @@ try await cluster.send(action: StartUpAction.appDidCompleteLaunching)
 ```
 
 ## License
-[MIT License](LICENSE)
+
+[MIT License](/valentinradu/Trellis/blob/main/LICENSE)
